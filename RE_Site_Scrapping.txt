@@ -1,0 +1,74 @@
+import requests
+from bs4 import BeautifulSoup
+from unicodedata import normalize
+import os
+import csv
+
+def get_all_links(url):
+    r = requests.get(url)
+    html = r.text
+    soup = BeautifulSoup(html, 'lxml')
+    links = soup.find()
+    hrefs = soup.find('div', class_ = 'main-col').find_all('div', class_ = 'a-card__inc')
+    sylki = []
+    prefix = 'https://------'
+    for href in hrefs:
+        a = href.find('a').get('href')
+        sylki.append(prefix + a)
+    return sylki
+
+def get_page_data(sylki):
+    for link in sylki:
+        soup1 = BeautifulSoup(requests.get(link).text, 'lxml')
+        try:
+            address = soup1.find('h1').text.strip().split(',')[1]
+        except:
+            address = ''
+        try:
+            price = soup1.find('div', class_ = 'offer__price').text.strip().lower()
+            price = normalize('NFKD', price).replace(' ₸', '').replace(' ', '')
+        except:
+            price = ''
+        keys = soup1.find('div', class_ = 'offer__short-description').select('div.offer__info-title')
+        values = soup1.find('div', class_ = 'offer__short-description').select('div.offer__advert-short-info')
+        new_dict = {k.text: v.text for k, v in zip(keys, values)}
+        if 'Общая площадь, м²' in new_dict.keys():
+            space = new_dict['Общая площадь, м²']
+        else:
+            space = ''
+        if 'Год постройки здания (Сдачи в эксплуатацию)' in new_dict.keys():
+            year = new_dict['Год постройки здания (Сдачи в эксплуатацию)'].strip().replace(' г.', '')
+        else:
+            year = ''
+        if 'Тип офиса' in new_dict.keys():
+            type_of = new_dict['Тип офиса']
+        else:
+            type_of = ''
+        if 'Количество комнат' in new_dict.keys():
+            rooms = new_dict['Количество комнат']
+        else:
+            rooms = ''
+        if 'Состояние' in new_dict.keys():
+            condit = new_dict['Состояние']
+        else:
+            condit = ''
+        ID = link[-8:]
+#         txt = ID + ',' + str(address) + ',' + price + ',' + space + ',' + year + ',' + type_of + ',' + rooms + ',' + condit
+        with open(r'Krisha_Office.csv', 'a', encoding="utf-8", newline='') as csvfile:
+            fieldnames = ['ID', 'address','price', 'space', 'year', 'office type', 'rooms number', 'condition']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writerow({'ID':ID,'address': address, 'price':price, 'space':space, 'year':year, 'office type':type_of, 'rooms number':rooms, 'condition':condit})
+
+def main():
+    URL = 'https://------/prodazha/ofisa/almaty/?page='
+    current_page = 0
+    while current_page != 54:
+        current_page = current_page + 1
+        url = URL + str(current_page)
+        sylki = get_all_links(url)
+        get_page_data(sylki)
+        # with open('cv_description.txt', 'a', encoding='utf-8') as f:
+        #     f.write(text)
+
+if __name__ =='__main__':
+    main()
